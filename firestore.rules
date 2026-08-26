@@ -1,0 +1,71 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function isTrade(data) {
+      return data.keys().hasAll(['date', 'direction', 'entryPrice', 'exitPrice', 'stopLoss', 'lotSize',
+                                   'session', 'setupType', 'mistakeTag', 'riskAmount', 'pnl', 'rMultiple',
+                                   'emotionBefore', 'emotionDuring', 'emotionAfter', 'notes', 'createdAt'])
+        && data.date is string
+        && data.direction in ['Long', 'Short']
+        && data.entryPrice is number && data.entryPrice > 0
+        && data.exitPrice is number && data.exitPrice > 0
+        && data.stopLoss is number && data.stopLoss > 0
+        && data.lotSize is number && data.lotSize > 0
+        && data.session in ['Asian', 'London', 'New York', 'Overlap']
+        && data.setupType in ['Trend Continuation', 'Reversal', 'Range Breakout', 'Liquidity Sweep',
+                               'News Fade', 'Support/Resistance', 'Other']
+        && data.mistakeTag in ['None', 'Revenge Trade', 'Early Entry', 'Late Entry', 'Moved Stop',
+                                 'Oversized', 'No Setup', 'FOMO', 'Ignored Checklist']
+        && data.riskAmount is number
+        && data.pnl is number
+        && data.rMultiple is number
+        && data.emotionBefore is number && data.emotionBefore >= 1 && data.emotionBefore <= 5
+        && data.emotionDuring is number && data.emotionDuring >= 1 && data.emotionDuring <= 5
+        && data.emotionAfter is number && data.emotionAfter >= 1 && data.emotionAfter <= 5
+        && data.notes is string
+        && data.createdAt is number;
+    }
+
+    // /users/{uid}/trades/{tradeId}
+    match /users/{uid}/trades/{tradeId} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid) && isTrade(request.resource.data);
+    }
+
+    // /users/{uid}/checklists/{dateId}
+    match /users/{uid}/checklists/{dateId} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // /users/{uid}/psychology/{dateId}
+    match /users/{uid}/psychology/{dateId} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // /users/{uid}/playbook/{pageId}
+    match /users/{uid}/playbook/{pageId} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // /users/{uid}/riskSettings/config
+    match /users/{uid}/riskSettings/{docId} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // /users/{uid}/economicEvents/{eventId}
+    match /users/{uid}/economicEvents/{eventId} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // Deny everything else by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
