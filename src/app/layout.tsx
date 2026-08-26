@@ -12,6 +12,8 @@ export const metadata: Metadata = {
   description: "Journal, discipline, and performance system for gold traders."
 };
 
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
