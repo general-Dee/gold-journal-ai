@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { Badge, Button, Card } from "@/components/ui/primitives";
@@ -83,7 +84,14 @@ export default function TradeDetailPage() {
             {trade.screenshotUrl && (
               <div className="mt-6 border-t border-line pt-5">
                 <div className="mb-2 font-mono text-[11px] uppercase tracking-[0.14em] text-faint">Screenshot</div>
-                <img src={trade.screenshotUrl} alt="Trade screenshot" className="max-h-96 rounded-md border border-line" />
+                <div className="relative h-96 w-full">
+                  <Image
+                    src={trade.screenshotUrl}
+                    alt="Trade screenshot"
+                    fill
+                    className="rounded-md border border-line object-contain"
+                  />
+                </div>
               </div>
             )}
           </Card>

@@ -203,6 +203,7 @@ export function TradeFormModal({
         <div className="mt-4">
           <Label>Screenshot (optional)</Label>
           {(pendingDataUrl ?? form.screenshotUrl) && (
+            // eslint-disable-next-line @next/next/no-img-element -- previews an unsaved local file via a data: URL, which next/image can't render
             <img
               src={pendingDataUrl ?? form.screenshotUrl}
               alt="Trade screenshot preview"
