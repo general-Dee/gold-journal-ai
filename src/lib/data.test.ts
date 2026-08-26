@@ -109,6 +109,16 @@ describe("trades", () => {
     expect(setDoc).toHaveBeenCalledWith(expect.objectContaining({ kind: "doc" }), trade);
   });
 
+  it("saveTrade strips explicit undefined optional fields, since Firestore rejects them", async () => {
+    const trade = { ...validTrade(), takeProfit: undefined, screenshotUrl: undefined };
+
+    await saveTrade(UID, trade);
+
+    const written = setDoc.mock.calls[0][1];
+    expect(written).not.toHaveProperty("takeProfit");
+    expect(written).not.toHaveProperty("screenshotUrl");
+  });
+
   it("saveTrade rejects a trade that fails schema validation before writing", async () => {
     const invalid = { ...validTrade(), direction: "Sideways" } as unknown as Trade;
 

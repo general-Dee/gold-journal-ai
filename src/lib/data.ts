@@ -28,6 +28,12 @@ import type {
   EconomicEvent
 } from "./types";
 
+// Firestore rejects any field whose value is `undefined` (as opposed to a missing
+// key or `null`), which optional Trade/EconomicEvent fields become when left blank in a form.
+function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
+}
+
 // ---------- Trades ----------
 export async function listTrades(uid: string): Promise<Trade[]> {
   const q = query(collection(db, "users", uid, "trades"), orderBy("createdAt", "desc"));
@@ -36,7 +42,7 @@ export async function listTrades(uid: string): Promise<Trade[]> {
 }
 
 export async function saveTrade(uid: string, trade: Trade): Promise<void> {
-  await setDoc(doc(db, "users", uid, "trades", trade.id), TradeSchema.parse(trade));
+  await setDoc(doc(db, "users", uid, "trades", trade.id), stripUndefined(TradeSchema.parse(trade)));
 }
 
 export async function deleteTrade(uid: string, tradeId: string): Promise<void> {
@@ -108,7 +114,7 @@ export async function listEconomicEvents(uid: string): Promise<EconomicEvent[]> 
 }
 
 export async function saveEconomicEvent(uid: string, event: EconomicEvent): Promise<void> {
-  await setDoc(doc(db, "users", uid, "economicEvents", event.id), EconomicEventSchema.parse(event));
+  await setDoc(doc(db, "users", uid, "economicEvents", event.id), stripUndefined(EconomicEventSchema.parse(event)));
 }
 
 export async function deleteEconomicEvent(uid: string, eventId: string): Promise<void> {
