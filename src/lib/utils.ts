@@ -173,3 +173,34 @@ export function buildEquityCurve(trades: Trade[], startingBalance: number) {
 export function todayId() {
   return new Date().toISOString().slice(0, 10);
 }
+
+const CSV_COLUMNS: Array<keyof Trade> = [
+  "date",
+  "direction",
+  "entryPrice",
+  "exitPrice",
+  "stopLoss",
+  "takeProfit",
+  "lotSize",
+  "session",
+  "setupType",
+  "mistakeTag",
+  "riskAmount",
+  "pnl",
+  "rMultiple",
+  "emotionBefore",
+  "emotionDuring",
+  "emotionAfter",
+  "notes"
+];
+
+function csvEscape(value: unknown): string {
+  const s = value === undefined || value === null ? "" : String(value);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+export function tradesToCsv(trades: Trade[]): string {
+  const header = CSV_COLUMNS.join(",");
+  const rows = trades.map((t) => CSV_COLUMNS.map((col) => csvEscape(t[col])).join(","));
+  return [header, ...rows].join("\n");
+}

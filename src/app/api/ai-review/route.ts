@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
     }));
 
     const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-sonnet-5",
       max_tokens: 700,
       system:
         "You are a disciplined trading-performance analyst reviewing ONLY the trader's own historical, already-closed XAUUSD journal entries provided in the user message. " +

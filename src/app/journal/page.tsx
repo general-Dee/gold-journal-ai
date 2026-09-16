@@ -7,7 +7,7 @@ import { Badge, Button, Card, Select } from "@/components/ui/primitives";
 import { TradeFormModal } from "@/components/TradeFormModal";
 import { useAuth } from "@/lib/auth-context";
 import { listTrades, saveTrade, deleteTrade } from "@/lib/data";
-import { formatCurrency, formatR } from "@/lib/utils";
+import { formatCurrency, formatR, todayId, tradesToCsv } from "@/lib/utils";
 import type { Trade } from "@/lib/types";
 
 export default function JournalPage() {
@@ -69,6 +69,17 @@ export default function JournalPage() {
     refresh();
   }
 
+  function exportCsv() {
+    const csv = tradesToCsv(filtered);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `goldjournal-trades-${todayId()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function runAiReview() {
     if (!user || trades.length === 0) return;
     setAiLoading(true);
@@ -111,6 +122,9 @@ export default function JournalPage() {
           </Select>
         </div>
         <div className="flex gap-3">
+          <Button variant="ghost" onClick={exportCsv} disabled={filtered.length === 0}>
+            Export CSV
+          </Button>
           <Button variant="ghost" onClick={runAiReview} disabled={aiLoading || trades.length === 0}>
             {aiLoading ? "Analyzing…" : "AI Pattern Review"}
           </Button>
