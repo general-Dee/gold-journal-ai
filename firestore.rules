@@ -32,6 +32,47 @@ service cloud.firestore {
         && data.createdAt is number;
     }
 
+    function isChecklist(data) {
+      return data.keys().hasAll(['items', 'biasNotes', 'keyLevels', 'completedAt'])
+        && data.items is list
+        && data.biasNotes is string
+        && data.keyLevels is string
+        && (data.completedAt == null || data.completedAt is number);
+    }
+
+    function isPsychology(data) {
+      return data.keys().hasAll(['disciplineScore', 'moodScore', 'rulesFollowed', 'revengeTradeFlag', 'reflection'])
+        && data.disciplineScore is number
+        && data.moodScore is number
+        && data.rulesFollowed is bool
+        && data.revengeTradeFlag is bool
+        && data.reflection is string;
+    }
+
+    function isPlaybookPage(data) {
+      return data.keys().hasAll(['title', 'content', 'updatedAt', 'createdAt'])
+        && data.title is string
+        && data.content is string
+        && data.updatedAt is number
+        && data.createdAt is number;
+    }
+
+    function isRiskSettings(data) {
+      return data.keys().hasAll(['accountBalance', 'riskPerTradePct', 'maxDailyLossPct', 'maxWeeklyLossPct'])
+        && data.accountBalance is number
+        && data.riskPerTradePct is number
+        && data.maxDailyLossPct is number
+        && data.maxWeeklyLossPct is number;
+    }
+
+    function isEconomicEvent(data) {
+      return data.keys().hasAll(['date', 'time', 'title', 'impact'])
+        && data.date is string
+        && data.time is string
+        && data.title is string
+        && data.impact in ['Low', 'Medium', 'High'];
+    }
+
     // /users/{uid}/trades/{tradeId}
     match /users/{uid}/trades/{tradeId} {
       allow read, delete: if isOwner(uid);
@@ -40,27 +81,32 @@ service cloud.firestore {
 
     // /users/{uid}/checklists/{dateId}
     match /users/{uid}/checklists/{dateId} {
-      allow read, write: if isOwner(uid);
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid) && isChecklist(request.resource.data);
     }
 
     // /users/{uid}/psychology/{dateId}
     match /users/{uid}/psychology/{dateId} {
-      allow read, write: if isOwner(uid);
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid) && isPsychology(request.resource.data);
     }
 
     // /users/{uid}/playbook/{pageId}
     match /users/{uid}/playbook/{pageId} {
-      allow read, write: if isOwner(uid);
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid) && isPlaybookPage(request.resource.data);
     }
 
     // /users/{uid}/riskSettings/config
     match /users/{uid}/riskSettings/{docId} {
-      allow read, write: if isOwner(uid);
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid) && isRiskSettings(request.resource.data);
     }
 
     // /users/{uid}/economicEvents/{eventId}
     match /users/{uid}/economicEvents/{eventId} {
-      allow read, write: if isOwner(uid);
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid) && isEconomicEvent(request.resource.data);
     }
 
     // Deny everything else by default

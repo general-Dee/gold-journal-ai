@@ -6,7 +6,8 @@ import {
   calculateTradePnl,
   cx,
   formatCurrency,
-  formatR
+  formatR,
+  tradesToCsv
 } from "./utils";
 import type { Trade } from "./types";
 
@@ -205,5 +206,24 @@ describe("buildEquityCurve", () => {
 
   it("returns just the starting balance point set when there are no trades", () => {
     expect(buildEquityCurve([], 1000)).toEqual([]);
+  });
+});
+
+describe("tradesToCsv", () => {
+  it("returns just the header row for an empty list", () => {
+    expect(tradesToCsv([])).toBe(
+      "date,direction,entryPrice,exitPrice,stopLoss,takeProfit,lotSize,session,setupType,mistakeTag,riskAmount,pnl,rMultiple,emotionBefore,emotionDuring,emotionAfter,notes"
+    );
+  });
+
+  it("serializes a trade row and leaves optional fields blank when absent", () => {
+    const csv = tradesToCsv([makeTrade({ id: "1", createdAt: 1 })]);
+    const [, row] = csv.split("\n");
+    expect(row).toBe("2026-08-20,Long,2400,2410,2395,,0.1,London,Trend Continuation,None,50,100,2,3,3,3,");
+  });
+
+  it("quotes and escapes fields containing commas, quotes, or newlines", () => {
+    const csv = tradesToCsv([makeTrade({ id: "1", createdAt: 1, notes: 'line one\nhad "quotes", and a comma' })]);
+    expect(csv.endsWith('"line one\nhad ""quotes"", and a comma"')).toBe(true);
   });
 });

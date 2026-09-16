@@ -5,7 +5,10 @@ service firebase.storage {
 
     // users/{uid}/trades/{tradeId}.jpg — trade screenshots, owner-only.
     match /users/{uid}/trades/{fileName} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
     }
 
     // Deny everything else by default.

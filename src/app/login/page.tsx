@@ -7,16 +7,23 @@ import { friendlyAuthErrorMessage } from "@/lib/auth-errors";
 import { Button, Card, Input, Label } from "@/components/ui/primitives";
 
 export default function LoginPage() {
-  const { login, signup, user } = useAuth();
+  const { login, signup, resetPassword, user } = useAuth();
   const router = useRouter();
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<"login" | "signup" | "reset">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [resetSent, setResetSent] = useState(false);
   const [busy, setBusy] = useState(false);
 
   if (user) {
     router.replace("/");
+  }
+
+  function switchMode(next: "login" | "signup" | "reset") {
+    setMode(next);
+    setError(null);
+    setResetSent(false);
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -26,10 +33,19 @@ export default function LoginPage() {
     try {
       if (mode === "login") {
         await login(email, password);
-      } else {
+        router.replace("/");
+      } else if (mode === "signup") {
         await signup(email, password);
+        router.replace("/");
+      } else {
+        try {
+          await resetPassword(email);
+        } catch (err) {
+          const code = (err as { code?: string } | null)?.code;
+          if (code !== "auth/user-not-found") throw err;
+        }
+        setResetSent(true);
       }
-      router.replace("/");
     } catch (err) {
       setError(friendlyAuthErrorMessage(err));
     } finally {
@@ -48,30 +64,57 @@ export default function LoginPage() {
         </div>
 
         <Card className="p-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Label>Email</Label>
-              <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@desk.com" />
+          {mode === "reset" && resetSent ? (
+            <div className="text-sm leading-relaxed text-ink">
+              If an account exists for <span className="text-gold-bright">{email}</span>, a password reset link is on its way.
             </div>
-            <div>
-              <Label>Password</Label>
-              <Input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
-            </div>
-            {error && <div className="rounded-md border border-loss/30 bg-loss/10 px-3 py-2 text-xs text-loss">{error}</div>}
-            <Button type="submit" className="w-full" disabled={busy}>
-              {busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
-            </Button>
-          </form>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label>Email</Label>
+                <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@desk.com" />
+              </div>
+              {mode !== "reset" && (
+                <div>
+                  <div className="flex items-center justify-between">
+                    <Label>Password</Label>
+                    {mode === "login" && (
+                      <button
+                        type="button"
+                        onClick={() => switchMode("reset")}
+                        className="mb-1.5 font-mono text-[11px] uppercase tracking-[0.1em] text-faint hover:text-gold-bright"
+                      >
+                        Forgot password?
+                      </button>
+                    )}
+                  </div>
+                  <Input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+                </div>
+              )}
+              {error && <div className="rounded-md border border-loss/30 bg-loss/10 px-3 py-2 text-xs text-loss">{error}</div>}
+              <Button type="submit" className="w-full" disabled={busy}>
+                {busy ? "Please wait…" : mode === "login" ? "Sign in" : mode === "signup" ? "Create account" : "Send reset link"}
+              </Button>
+            </form>
+          )}
         </Card>
 
         <div className="mt-4 text-center text-xs text-muted">
-          {mode === "login" ? "New to the desk?" : "Already have an account?"}{" "}
-          <button
-            onClick={() => setMode(mode === "login" ? "signup" : "login")}
-            className="text-gold-bright hover:underline"
-          >
-            {mode === "login" ? "Create an account" : "Sign in"}
-          </button>
+          {mode === "reset" ? (
+            <button onClick={() => switchMode("login")} className="text-gold-bright hover:underline">
+              Back to sign in
+            </button>
+          ) : (
+            <>
+              {mode === "login" ? "New to the desk?" : "Already have an account?"}{" "}
+              <button
+                onClick={() => switchMode(mode === "login" ? "signup" : "login")}
+                className="text-gold-bright hover:underline"
+              >
+                {mode === "login" ? "Create an account" : "Sign in"}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
