@@ -11,10 +11,32 @@ export default function CalendarPage() {
   const { user } = useAuth();
   const [events, setEvents] = useState<EconomicEvent[]>([]);
   const [form, setForm] = useState<Partial<EconomicEvent>>({ impact: "High", date: new Date().toISOString().slice(0, 10) });
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   async function refresh() {
     if (!user) return;
     setEvents(await listEconomicEvents(user.uid));
+  }
+
+  async function handleSync() {
+    if (!user) return;
+    setSyncLoading(true);
+    setSyncMessage(null);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/economic-calendar/sync", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json().catch(() => null);
+      setSyncMessage(data?.message ?? "Could not reach the calendar sync service.");
+      if (res.ok) refresh();
+    } catch {
+      setSyncMessage("Could not reach the calendar sync service. Check your FINNHUB_API_KEY setup.");
+    } finally {
+      setSyncLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -47,6 +69,13 @@ export default function CalendarPage() {
 
   return (
     <AppShell eyebrow="News & Events" title="Economic Calendar">
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <Button variant="ghost" onClick={handleSync} disabled={syncLoading}>
+          {syncLoading ? "Syncing…" : "Sync Gold Calendar"}
+        </Button>
+        {syncMessage && <div className="text-xs text-muted">{syncMessage}</div>}
+      </div>
+
       <Card className="mb-5 p-5">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
           <Input type="date" value={form.date ?? ""} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
