@@ -133,6 +133,20 @@ describe("POST /api/economic-calendar/sync", () => {
     });
   });
 
+  it("omits notes (never undefined) for events with no forecast or previous value", async () => {
+    withAdminEnv();
+    verifyIdToken.mockResolvedValue({ uid: "u1" });
+    runTransaction.mockResolvedValue(true);
+    batchCommit.mockResolvedValue(undefined);
+    mockFeeds([{ country: "USD", title: "FOMC Statement", impact: "High", date: "2026-10-01T14:00:00-04:00", forecast: "", previous: "" }]);
+
+    await POST(makeRequest({ authorization: "Bearer ok" }));
+
+    const [, event] = batchSet.mock.calls[0];
+    expect(event).not.toHaveProperty("notes");
+    expect(Object.values(event)).not.toContain(undefined);
+  });
+
   it("still syncs this week's events when next week's file is missing (404)", async () => {
     withAdminEnv();
     verifyIdToken.mockResolvedValue({ uid: "u1" });

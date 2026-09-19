@@ -122,18 +122,21 @@ export async function POST(req: NextRequest) {
       const [date, timeWithMs] = when.toISOString().split("T");
       const time = timeWithMs.slice(0, 8);
 
+      const notes = [
+        item.forecast ? `Fcst: ${item.forecast}` : null,
+        item.previous ? `Prev: ${item.previous}` : null
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+      // Omit `notes` entirely when empty: Firestore rejects undefined field values.
       const event = EconomicEventSchema.parse({
         id: `auto-${date}-${slugify(item.title)}`,
         date,
         time,
         title: item.title,
         impact,
-        notes: [
-          item.forecast ? `Fcst: ${item.forecast}` : null,
-          item.previous ? `Prev: ${item.previous}` : null
-        ]
-          .filter(Boolean)
-          .join(" · ") || undefined
+        ...(notes ? { notes } : {})
       });
 
       const ref = db.collection("users").doc(uid).collection("economicEvents").doc(event.id);
