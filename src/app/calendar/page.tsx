@@ -33,7 +33,7 @@ export default function CalendarPage() {
       setSyncMessage(data?.message ?? "Could not reach the calendar sync service.");
       if (res.ok) refresh();
     } catch {
-      setSyncMessage("Could not reach the calendar sync service. Check your FINNHUB_API_KEY setup.");
+      setSyncMessage("Could not reach the calendar sync service.");
     } finally {
       setSyncLoading(false);
     }

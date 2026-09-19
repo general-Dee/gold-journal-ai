@@ -8,18 +8,18 @@ export const runtime = "nodejs";
 const RATE_LIMIT_MAX_REQUESTS = 10;
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 
-const RELEVANT_COUNTRY = "US";
-const LOOKAHEAD_DAYS = 30;
+// Free, keyless weekly feed (Forex Factory data). Unofficial, so every
+// failure is surfaced as a friendly message rather than thrown.
+const FEED_BASE_URL = "https://nfs.faireconomy.media";
+const RELEVANT_CURRENCY = "USD";
 
-interface FinnhubEconomicEvent {
-  actual?: number | null;
+interface FeedEvent {
   country?: string;
-  estimate?: number | null;
-  event?: string;
+  date?: string;
+  forecast?: string;
   impact?: string;
-  prev?: number | null;
-  time?: string;
-  unit?: string;
+  previous?: string;
+  title?: string;
 }
 
 function slugify(text: string) {
@@ -88,54 +88,49 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: "You've hit the calendar sync rate limit. Try again in a bit." }, { status: 429 });
     }
 
-    if (!process.env.FINNHUB_API_KEY) {
+    const thisWeekRes = await fetch(`${FEED_BASE_URL}/ff_calendar_thisweek.json`);
+
+    if (!thisWeekRes.ok) {
       return NextResponse.json(
-        { message: "FINNHUB_API_KEY is not configured on the server. Add it in your Vercel project's environment variables." },
+        { message: `Could not fetch the economic calendar (feed returned ${thisWeekRes.status}). Try again shortly.` },
         { status: 200 }
       );
     }
 
-    const from = new Date().toISOString().slice(0, 10);
-    const to = new Date(Date.now() + LOOKAHEAD_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const raw: FeedEvent[] = (await thisWeekRes.json()) as FeedEvent[];
 
-    const finnhubRes = await fetch(
-      `https://finnhub.io/api/v1/calendar/economic?from=${from}&to=${to}&token=${process.env.FINNHUB_API_KEY}`
-    );
-
-    if (!finnhubRes.ok) {
-      const status = finnhubRes.status;
-      const hint = status === 403 ? " (this endpoint may require a paid Finnhub plan)" : "";
-      return NextResponse.json(
-        { message: `Could not fetch the economic calendar (Finnhub returned ${status})${hint}.` },
-        { status: 200 }
-      );
+    // Next week's file isn't always published yet; treat any failure as "no data".
+    try {
+      const nextWeekRes = await fetch(`${FEED_BASE_URL}/ff_calendar_nextweek.json`);
+      if (nextWeekRes.ok) raw.push(...((await nextWeekRes.json()) as FeedEvent[]));
+    } catch {
+      // ignore
     }
-
-    const body = (await finnhubRes.json()) as { economicCalendar?: FinnhubEconomicEvent[] };
-    const raw = body.economicCalendar ?? [];
 
     const db = getAdminDb();
     const batch = db.batch();
     const synced: EconomicEvent[] = [];
 
     for (const item of raw) {
-      if ((item.country ?? "").toUpperCase() !== RELEVANT_COUNTRY) continue;
+      if ((item.country ?? "").toUpperCase() !== RELEVANT_CURRENCY) continue;
       const impact = normalizeImpact(item.impact);
       if (impact !== "High" && impact !== "Medium") continue;
-      if (!item.event || !item.time) continue;
+      if (!item.title || !item.date) continue;
 
-      const [date, time = ""] = item.time.split(" ");
-      if (!date) continue;
+      const when = new Date(item.date);
+      if (Number.isNaN(when.getTime())) continue;
+      const [date, timeWithMs] = when.toISOString().split("T");
+      const time = timeWithMs.slice(0, 8);
 
       const event = EconomicEventSchema.parse({
-        id: `auto-${date}-${slugify(item.event)}`,
+        id: `auto-${date}-${slugify(item.title)}`,
         date,
         time,
-        title: item.event,
+        title: item.title,
         impact,
         notes: [
-          item.estimate != null ? `Est: ${item.estimate}${item.unit ?? ""}` : null,
-          item.prev != null ? `Prev: ${item.prev}${item.unit ?? ""}` : null
+          item.forecast ? `Fcst: ${item.forecast}` : null,
+          item.previous ? `Prev: ${item.previous}` : null
         ]
           .filter(Boolean)
           .join(" · ") || undefined

@@ -80,49 +80,38 @@ describe("POST /api/economic-calendar/sync", () => {
     expect(res.status).toBe(429);
   });
 
-  it("returns a config message with 200 when FINNHUB_API_KEY is missing", async () => {
+  function mockFeeds(thisWeek: unknown, nextWeekStatus = 404) {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes("thisweek")) return { ok: true, status: 200, json: async () => thisWeek };
+      return { ok: nextWeekStatus === 200, status: nextWeekStatus, json: async () => [] };
+    });
+  }
+
+  it("returns a message with 200 when the feed returns a non-ok response", async () => {
     withAdminEnv();
     verifyIdToken.mockResolvedValue({ uid: "u1" });
     runTransaction.mockResolvedValue(true);
+    fetchMock.mockResolvedValue({ ok: false, status: 429 });
 
     const res = await POST(makeRequest({ authorization: "Bearer ok" }));
 
     expect(res.status).toBe(200);
     const json = await res.json();
-    expect(json.message).toMatch(/FINNHUB_API_KEY/);
+    expect(json.message).toMatch(/429/);
   });
 
-  it("returns a message with 200 when Finnhub returns a non-ok response", async () => {
+  it("filters to USD medium/high impact events, converts to UTC, and writes them via a batch", async () => {
     withAdminEnv();
-    process.env.FINNHUB_API_KEY = "token";
-    verifyIdToken.mockResolvedValue({ uid: "u1" });
-    runTransaction.mockResolvedValue(true);
-    fetchMock.mockResolvedValue({ ok: false, status: 403 });
-
-    const res = await POST(makeRequest({ authorization: "Bearer ok" }));
-
-    expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json.message).toMatch(/403/);
-  });
-
-  it("filters to US medium/high impact events and writes them via a batch", async () => {
-    withAdminEnv();
-    process.env.FINNHUB_API_KEY = "token";
     verifyIdToken.mockResolvedValue({ uid: "u1" });
     runTransaction.mockResolvedValue(true);
     batchCommit.mockResolvedValue(undefined);
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        economicCalendar: [
-          { country: "US", event: "CPI", impact: "high", time: "2026-10-01 12:30:00", estimate: 3.1, prev: 3.0, unit: "%" },
-          { country: "US", event: "Low Impact Thing", impact: "low", time: "2026-10-02 08:00:00" },
-          { country: "DE", event: "German Factory Orders", impact: "high", time: "2026-10-03 06:00:00" },
-          { country: "US", event: "Fed Speech", impact: "medium", time: "2026-10-04 15:00:00" }
-        ]
-      })
-    });
+    mockFeeds([
+      { country: "USD", title: "CPI m/m", impact: "High", date: "2026-10-01T08:30:00-04:00", forecast: "0.3%", previous: "0.2%" },
+      { country: "USD", title: "Low Impact Thing", impact: "Low", date: "2026-10-02T08:00:00-04:00" },
+      { country: "EUR", title: "German Factory Orders", impact: "High", date: "2026-10-03T06:00:00-04:00" },
+      { country: "USD", title: "Bank Holiday", impact: "Holiday", date: "2026-10-05T00:00:00-04:00" },
+      { country: "USD", title: "Fed Speech", impact: "Medium", date: "2026-10-04T15:00:00-04:00" }
+    ]);
 
     const res = await POST(makeRequest({ authorization: "Bearer ok" }));
 
@@ -134,18 +123,34 @@ describe("POST /api/economic-calendar/sync", () => {
     expect(batchCommit).toHaveBeenCalledTimes(1);
 
     const [, firstEvent] = batchSet.mock.calls[0];
-    expect(firstEvent).toMatchObject({ id: "auto-2026-10-01-cpi", date: "2026-10-01", title: "CPI", impact: "High" });
+    expect(firstEvent).toMatchObject({
+      id: "auto-2026-10-01-cpi-m-m",
+      date: "2026-10-01",
+      time: "12:30:00",
+      title: "CPI m/m",
+      impact: "High",
+      notes: "Fcst: 0.3% · Prev: 0.2%"
+    });
+  });
+
+  it("still syncs this week's events when next week's file is missing (404)", async () => {
+    withAdminEnv();
+    verifyIdToken.mockResolvedValue({ uid: "u1" });
+    runTransaction.mockResolvedValue(true);
+    batchCommit.mockResolvedValue(undefined);
+    mockFeeds([{ country: "USD", title: "NFP", impact: "High", date: "2026-10-02T08:30:00-04:00" }], 404);
+
+    const res = await POST(makeRequest({ authorization: "Bearer ok" }));
+
+    const json = await res.json();
+    expect(json.count).toBe(1);
   });
 
   it("returns 0 synced without committing when nothing matches the filter", async () => {
     withAdminEnv();
-    process.env.FINNHUB_API_KEY = "token";
     verifyIdToken.mockResolvedValue({ uid: "u1" });
     runTransaction.mockResolvedValue(true);
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({ economicCalendar: [{ country: "DE", event: "Something", impact: "high", time: "2026-10-01 00:00:00" }] })
-    });
+    mockFeeds([{ country: "EUR", title: "Something", impact: "High", date: "2026-10-01T00:00:00-04:00" }]);
 
     const res = await POST(makeRequest({ authorization: "Bearer ok" }));
 
