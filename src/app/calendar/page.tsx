@@ -5,6 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import { Badge, Button, Card, Input, Select } from "@/components/ui/primitives";
 import { useAuth } from "@/lib/auth-context";
 import { listEconomicEvents, saveEconomicEvent, deleteEconomicEvent } from "@/lib/data";
+import { formatEventWhen } from "@/lib/event-time";
 import type { EconomicEvent } from "@/lib/types";
 
 export default function CalendarPage() {
@@ -99,7 +100,7 @@ export default function CalendarPage() {
         {events.map((e) => (
           <Card key={e.id} className="flex items-center justify-between px-5 py-3">
             <div className="flex items-center gap-4">
-              <div className="font-mono text-xs text-muted">{e.date} {e.time}</div>
+              <div className="font-mono text-xs text-muted">{formatEventWhen(e)}</div>
               <div className="text-sm text-ink">{e.title}</div>
               <Badge tone={impactTone[e.impact]}>{e.impact} Impact</Badge>
             </div>
