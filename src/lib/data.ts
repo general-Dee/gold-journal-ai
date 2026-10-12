@@ -7,7 +7,8 @@ import {
   getDoc,
   query,
   orderBy,
-  serverTimestamp
+  serverTimestamp,
+  limit
 } from "firebase/firestore";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { db, storage } from "./firebase";
@@ -25,11 +26,10 @@ import type {
   PsychologyEntry,
   PlaybookPage,
   RiskSettings,
-  EconomicEvent
+  EconomicEvent,
+  AiReview
 } from "./types";
 
-// Firestore rejects any field whose value is `undefined` (as opposed to a missing
-// key or `null`), which optional Trade/EconomicEvent fields become when left blank in a form.
 function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
   return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
 }
@@ -119,6 +119,17 @@ export async function saveEconomicEvent(uid: string, event: EconomicEvent): Prom
 
 export async function deleteEconomicEvent(uid: string, eventId: string): Promise<void> {
   await deleteDoc(doc(db, "users", uid, "economicEvents", eventId));
+}
+
+// ---------- AI Reviews ----------
+export async function saveAiReview(uid: string, review: AiReview): Promise<void> {
+  await setDoc(doc(db, "users", uid, "aiReviews", review.id), review);
+}
+
+export async function listAiReviews(uid: string, max = 10): Promise<AiReview[]> {
+  const q = query(collection(db, "users", uid, "aiReviews"), orderBy("createdAt", "desc"), limit(max));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => d.data() as AiReview);
 }
 
 export const serverTs = serverTimestamp;
