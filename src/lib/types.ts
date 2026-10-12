@@ -24,7 +24,7 @@ export type MistakeTag =
 
 export interface Trade {
   id: string;
-  date: string; // ISO date, e.g. 2026-08-20
+  date: string;
   direction: Direction;
   entryPrice: number;
   exitPrice: number;
@@ -34,12 +34,12 @@ export interface Trade {
   session: Session;
   setupType: SetupType;
   mistakeTag: MistakeTag;
-  riskAmount: number; // account currency risked
-  pnl: number; // realized P&L in account currency
-  rMultiple: number; // pnl / riskAmount
-  emotionBefore: number; // 1-5
-  emotionDuring: number; // 1-5
-  emotionAfter: number; // 1-5
+  riskAmount: number;
+  pnl: number;
+  rMultiple: number;
+  emotionBefore: number;
+  emotionDuring: number;
+  emotionAfter: number;
   notes: string;
   screenshotUrl?: string;
   createdAt: number;
@@ -52,7 +52,7 @@ export interface ChecklistItemState {
 }
 
 export interface DailyChecklist {
-  id: string; // date, e.g. 2026-08-20
+  id: string;
   items: ChecklistItemState[];
   biasNotes: string;
   keyLevels: string;
@@ -60,9 +60,9 @@ export interface DailyChecklist {
 }
 
 export interface PsychologyEntry {
-  id: string; // date
-  disciplineScore: number; // 1-10
-  moodScore: number; // 1-10
+  id: string;
+  disciplineScore: number;
+  moodScore: number;
   rulesFollowed: boolean;
   revengeTradeFlag: boolean;
   reflection: string;
@@ -72,7 +72,7 @@ export interface PsychologyEntry {
 export interface PlaybookPage {
   id: string;
   title: string;
-  content: string; // markdown-ish plain text, block-based in UI
+  content: string;
   updatedAt: number;
   createdAt: number;
 }
@@ -91,4 +91,11 @@ export interface EconomicEvent {
   title: string;
   impact: "Low" | "Medium" | "High";
   notes?: string;
+}
+
+export interface AiReview {
+  id: string;
+  summary: string;
+  tradeCount: number;
+  createdAt: number;
 }
