@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { AreaChart, Area, BarChart, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Cell } from "recharts";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardHeader, Badge, StatCard, Button } from "@/components/ui/primitives";
 import { useAuth } from "@/lib/auth-context";
 import { listTrades, getRiskSettings, getChecklist } from "@/lib/data";
-import { calculateStats, buildEquityCurve, formatCurrency, todayId } from "@/lib/utils";
+import { calculateStats, buildEquityCurve, buildDrawdownCurve, breakdownBySession, breakdownBySetup, formatCurrency, todayId } from "@/lib/utils";
 import type { Trade, RiskSettings } from "@/lib/types";
 import Link from "next/link";
 
@@ -46,6 +46,9 @@ export default function DashboardPage() {
   const startingBalance = risk?.accountBalance ?? 10000;
   const stats = useMemo(() => calculateStats(trades), [trades]);
   const equityCurve = useMemo(() => buildEquityCurve(trades, startingBalance), [trades, startingBalance]);
+  const drawdownCurve = useMemo(() => buildDrawdownCurve(trades, startingBalance), [trades, startingBalance]);
+  const sessionBreakdown = useMemo(() => breakdownBySession(trades), [trades]);
+  const setupBreakdown = useMemo(() => breakdownBySetup(trades), [trades]);
 
   const today = todayId();
   const todaysTrades = trades.filter((t) => t.date === today);
@@ -145,6 +148,80 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
+          </div>
+        </Card>
+      </div>
+
+      {drawdownCurve.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader eyebrow="Risk" title="Drawdown" />
+          <div className="h-48 px-4 py-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={drawdownCurve}>
+                <CartesianGrid stroke="#262B33" strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" tick={{ fill: "#5A5F68", fontSize: 11 }} axisLine={{ stroke: "#262B33" }} tickLine={false} />
+                <YAxis tick={{ fill: "#5A5F68", fontSize: 11 }} axisLine={false} tickLine={false} width={60} tickFormatter={(v) => `$${v}`} />
+                <Tooltip
+                  contentStyle={{ background: "#1B1F26", border: "1px solid #262B33", borderRadius: 8, fontSize: 12 }}
+                  formatter={(v: number, name: string) => [name === "drawdown" ? formatCurrency(v) : `${v}%`, name === "drawdown" ? "Drawdown" : "Drawdown %"]}
+                />
+                <Area type="monotone" dataKey="drawdown" stroke="#ef4444" strokeWidth={2} fill="#ef4444" fillOpacity={0.15} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      )}
+
+      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader eyebrow="By Session" title="Session Performance" />
+          <div className="h-56 px-4 py-4">
+            {sessionBreakdown.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={sessionBreakdown}>
+                  <CartesianGrid stroke="#262B33" strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fill: "#5A5F68", fontSize: 11 }} axisLine={{ stroke: "#262B33" }} tickLine={false} />
+                  <YAxis tick={{ fill: "#5A5F68", fontSize: 11 }} axisLine={false} tickLine={false} width={60} tickFormatter={(v) => `$${v}`} />
+                  <Tooltip
+                    contentStyle={{ background: "#1B1F26", border: "1px solid #262B33", borderRadius: 8, fontSize: 12 }}
+                    formatter={(v: number) => [formatCurrency(v), "P&L"]}
+                  />
+                  <Bar dataKey="totalPnl" radius={[4, 4, 0, 0]}>
+                    {sessionBreakdown.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.totalPnl >= 0 ? "#22c55e" : "#ef4444"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-faint">Not enough data yet.</div>
+            )}
+          </div>
+        </Card>
+
+        <Card>
+          <CardHeader eyebrow="By Setup" title="Setup Performance" />
+          <div className="h-56 px-4 py-4">
+            {setupBreakdown.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={setupBreakdown} layout="vertical">
+                  <CartesianGrid stroke="#262B33" strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" tick={{ fill: "#5A5F68", fontSize: 11 }} axisLine={{ stroke: "#262B33" }} tickLine={false} tickFormatter={(v) => `$${v}`} />
+                  <YAxis type="category" dataKey="label" tick={{ fill: "#5A5F68", fontSize: 11 }} axisLine={false} tickLine={false} width={100} />
+                  <Tooltip
+                    contentStyle={{ background: "#1B1F26", border: "1px solid #262B33", borderRadius: 8, fontSize: 12 }}
+                    formatter={(v: number) => [formatCurrency(v), "P&L"]}
+                  />
+                  <Bar dataKey="totalPnl" radius={[0, 4, 4, 0]}>
+                    {setupBreakdown.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.totalPnl >= 0 ? "#22c55e" : "#ef4444"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-faint">Not enough data yet.</div>
+            )}
           </div>
         </Card>
       </div>
