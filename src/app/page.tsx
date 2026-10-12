@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AreaChart, Area, BarChart, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Cell } from "recharts";
+import { AreaChart, Area, ComposedChart, Bar, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Cell, Legend } from "recharts";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardHeader, Badge, StatCard, Button } from "@/components/ui/primitives";
 import { useAuth } from "@/lib/auth-context";
@@ -175,23 +175,29 @@ export default function DashboardPage() {
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader eyebrow="By Session" title="Session Performance" />
-          <div className="h-56 px-4 py-4">
+          <div className="h-64 px-4 py-4">
             {sessionBreakdown.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={sessionBreakdown}>
+                <ComposedChart data={sessionBreakdown}>
                   <CartesianGrid stroke="#262B33" strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="label" tick={{ fill: "#5A5F68", fontSize: 11 }} axisLine={{ stroke: "#262B33" }} tickLine={false} />
-                  <YAxis tick={{ fill: "#5A5F68", fontSize: 11 }} axisLine={false} tickLine={false} width={60} tickFormatter={(v) => `$${v}`} />
+                  <YAxis yAxisId="pnl" tick={{ fill: "#5A5F68", fontSize: 11 }} axisLine={false} tickLine={false} width={60} tickFormatter={(v) => `$${v}`} />
+                  <YAxis yAxisId="wr" orientation="right" tick={{ fill: "#5A5F68", fontSize: 11 }} axisLine={false} tickLine={false} width={40} domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
                   <Tooltip
                     contentStyle={{ background: "#1B1F26", border: "1px solid #262B33", borderRadius: 8, fontSize: 12 }}
-                    formatter={(v: number) => [formatCurrency(v), "P&L"]}
+                    formatter={(v: number, name: string) => [
+                      name === "totalPnl" ? formatCurrency(v) : `${v.toFixed(1)}%`,
+                      name === "totalPnl" ? "P&L" : "Win Rate"
+                    ]}
                   />
-                  <Bar dataKey="totalPnl" radius={[4, 4, 0, 0]}>
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar yAxisId="pnl" dataKey="totalPnl" name="P&L" radius={[4, 4, 0, 0]}>
                     {sessionBreakdown.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.totalPnl >= 0 ? "#22c55e" : "#ef4444"} />
                     ))}
                   </Bar>
-                </BarChart>
+                  <Line yAxisId="wr" type="monotone" dataKey="winRate" name="Win Rate" stroke="#E4C455" strokeWidth={2} dot={{ r: 4, fill: "#E4C455" }} />
+                </ComposedChart>
               </ResponsiveContainer>
             ) : (
               <div className="flex h-full items-center justify-center text-sm text-faint">Not enough data yet.</div>
@@ -201,23 +207,29 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader eyebrow="By Setup" title="Setup Performance" />
-          <div className="h-56 px-4 py-4">
+          <div className="h-64 px-4 py-4">
             {setupBreakdown.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={setupBreakdown} layout="vertical">
+                <ComposedChart data={setupBreakdown} layout="vertical">
                   <CartesianGrid stroke="#262B33" strokeDasharray="3 3" horizontal={false} />
-                  <XAxis type="number" tick={{ fill: "#5A5F68", fontSize: 11 }} axisLine={{ stroke: "#262B33" }} tickLine={false} tickFormatter={(v) => `$${v}`} />
+                  <XAxis type="number" xAxisId="pnl" tick={{ fill: "#5A5F68", fontSize: 11 }} axisLine={{ stroke: "#262B33" }} tickLine={false} tickFormatter={(v) => `$${v}`} />
+                  <XAxis type="number" xAxisId="wr" orientation="top" tick={{ fill: "#5A5F68", fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
                   <YAxis type="category" dataKey="label" tick={{ fill: "#5A5F68", fontSize: 11 }} axisLine={false} tickLine={false} width={100} />
                   <Tooltip
                     contentStyle={{ background: "#1B1F26", border: "1px solid #262B33", borderRadius: 8, fontSize: 12 }}
-                    formatter={(v: number) => [formatCurrency(v), "P&L"]}
+                    formatter={(v: number, name: string) => [
+                      name === "totalPnl" ? formatCurrency(v) : `${v.toFixed(1)}%`,
+                      name === "totalPnl" ? "P&L" : "Win Rate"
+                    ]}
                   />
-                  <Bar dataKey="totalPnl" radius={[0, 4, 4, 0]}>
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar xAxisId="pnl" dataKey="totalPnl" name="P&L" radius={[0, 4, 4, 0]}>
                     {setupBreakdown.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.totalPnl >= 0 ? "#22c55e" : "#ef4444"} />
                     ))}
                   </Bar>
-                </BarChart>
+                  <Line xAxisId="wr" type="monotone" dataKey="winRate" name="Win Rate" stroke="#E4C455" strokeWidth={2} dot={{ r: 4, fill: "#E4C455" }} />
+                </ComposedChart>
               </ResponsiveContainer>
             ) : (
               <div className="flex h-full items-center justify-center text-sm text-faint">Not enough data yet.</div>
