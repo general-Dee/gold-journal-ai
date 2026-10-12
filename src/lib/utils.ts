@@ -35,7 +35,7 @@ export function calculatePositionSize(params: {
   riskPct: number;
   entryPrice: number;
   stopLoss: number;
-  pointValuePerLot?: number; // USD value of a 1.00-price-point move per 1.00 lot, default 100
+  pointValuePerLot?: number;
 }) {
   const { accountBalance, riskPct, entryPrice, stopLoss, pointValuePerLot = DEFAULT_POINT_VALUE_PER_LOT } = params;
   const riskAmount = accountBalance * (riskPct / 100);
@@ -111,7 +111,6 @@ export function calculateStats(trades: Trade[]): TradeStats {
   const profitFactor = grossLoss === 0 ? grossWin : grossWin / grossLoss;
   const expectancy = (winRate / 100) * avgWin + (1 - winRate / 100) * avgLoss;
 
-  // streak
   let currentStreak = 0;
   let streakType: "win" | "loss" | "none" = "none";
   for (let i = sorted.length - 1; i >= 0; i--) {
@@ -126,7 +125,6 @@ export function calculateStats(trades: Trade[]): TradeStats {
     }
   }
 
-  // setup performance
   const setupPnl = new Map<string, number>();
   for (const t of sorted) {
     setupPnl.set(t.setupType, (setupPnl.get(t.setupType) ?? 0) + t.pnl);
@@ -168,6 +166,57 @@ export function buildEquityCurve(trades: Trade[], startingBalance: number) {
     running += t.pnl;
     return { date: t.date, balance: Math.round(running * 100) / 100 };
   });
+}
+
+export function buildDrawdownCurve(trades: Trade[], startingBalance: number) {
+  const equity = buildEquityCurve(trades, startingBalance);
+  let peak = startingBalance;
+  return equity.map((point) => {
+    if (point.balance > peak) peak = point.balance;
+    const dd = peak - point.balance;
+    const ddPct = peak > 0 ? (dd / peak) * 100 : 0;
+    return { date: point.date, drawdown: Math.round(dd * 100) / 100, drawdownPct: Math.round(ddPct * 10) / 10 };
+  });
+}
+
+export interface BreakdownRow {
+  label: string;
+  trades: number;
+  winRate: number;
+  totalPnl: number;
+  avgR: number;
+}
+
+export function breakdownBySession(trades: Trade[]): BreakdownRow[] {
+  return breakdownBy(trades, (t) => t.session);
+}
+
+export function breakdownBySetup(trades: Trade[]): BreakdownRow[] {
+  return breakdownBy(trades, (t) => t.setupType);
+}
+
+function breakdownBy(trades: Trade[], keyFn: (t: Trade) => string): BreakdownRow[] {
+  const groups = new Map<string, Trade[]>();
+  for (const t of trades) {
+    const k = keyFn(t);
+    const arr = groups.get(k) ?? [];
+    arr.push(t);
+    groups.set(k, arr);
+  }
+  const rows: BreakdownRow[] = [];
+  for (const [label, group] of groups.entries()) {
+    const wins = group.filter((t) => t.pnl > 0).length;
+    const totalPnl = group.reduce((s, t) => s + t.pnl, 0);
+    const avgR = group.reduce((s, t) => s + t.rMultiple, 0) / group.length;
+    rows.push({
+      label,
+      trades: group.length,
+      winRate: (wins / group.length) * 100,
+      totalPnl: Math.round(totalPnl * 100) / 100,
+      avgR: Math.round(avgR * 100) / 100
+    });
+  }
+  return rows.sort((a, b) => b.totalPnl - a.totalPnl);
 }
 
 export function todayId() {

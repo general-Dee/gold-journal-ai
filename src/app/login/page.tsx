@@ -54,13 +54,23 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg px-4">
-      <div className="w-full max-w-sm">
+    <div className="flex min-h-screen items-center justify-center bg-bg px-4 py-10">
+      <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="font-display text-2xl font-semibold text-ink">
+          <div className="font-display text-3xl font-semibold text-ink">
             Gold<span className="text-gold-bright">Journal</span>
           </div>
           <div className="mt-1 font-mono text-[11px] uppercase tracking-[0.16em] text-faint">XAUUSD Trading Desk</div>
+          <p className="mt-4 text-sm leading-relaxed text-muted">
+            A discipline-focused journal for gold traders. Log trades, track psychology, enforce risk limits, and get AI pattern reviews based only on your own closed trades. No signals. No predictions.
+          </p>
+        </div>
+
+        <div className="mb-6 grid grid-cols-2 gap-3 text-xs text-muted">
+          <div className="rounded border border-line bg-surface px-3 py-2">Trade journal + equity curve</div>
+          <div className="rounded border border-line bg-surface px-3 py-2">Pre-market checklist</div>
+          <div className="rounded border border-line bg-surface px-3 py-2">Risk calculator & loss locks</div>
+          <div className="rounded border border-line bg-surface px-3 py-2">AI pattern review</div>
         </div>
 
         <Card className="p-6">
