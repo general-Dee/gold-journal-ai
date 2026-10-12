@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getAdminAuth, getAdminDb } from "@/lib/firebase-admin";
 import { AiReviewRequestSchema } from "@/lib/schemas";
+import { randomUUID } from "crypto";
 
 export const runtime = "nodejs";
 
@@ -83,7 +84,6 @@ export async function POST(req: NextRequest) {
 
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-    // Strip to the fields relevant to pattern analysis; never send account identifiers.
     const compact = trades.slice(0, 200).map((t) => ({
       date: t.date,
       direction: t.direction,
@@ -117,7 +117,17 @@ export async function POST(req: NextRequest) {
     const textBlock = message.content.find((b: Anthropic.ContentBlock) => b.type === "text");
     const summary = textBlock && "text" in textBlock ? textBlock.text : "No insights returned.";
 
-    return NextResponse.json({ summary });
+    // Persist the review
+    const db = getAdminDb();
+    const reviewId = randomUUID();
+    await db.collection("users").doc(uid).collection("aiReviews").doc(reviewId).set({
+      id: reviewId,
+      summary,
+      tradeCount: trades.length,
+      createdAt: Date.now()
+    });
+
+    return NextResponse.json({ summary, reviewId });
   } catch (err) {
     console.error("AI review error:", err);
     return NextResponse.json({ summary: "The AI review service hit an error. Please try again shortly." }, { status: 200 });
