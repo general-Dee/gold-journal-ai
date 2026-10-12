@@ -3,15 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { AppShell } from "@/components/AppShell";
-import { Card, CardHeader, Badge, StatCard } from "@/components/ui/primitives";
+import { Card, CardHeader, Badge, StatCard, Button } from "@/components/ui/primitives";
 import { useAuth } from "@/lib/auth-context";
-import { listTrades, getRiskSettings } from "@/lib/data";
-import { calculateStats, buildEquityCurve, formatCurrency, formatR } from "@/lib/utils";
-import type { Trade } from "@/lib/types";
+import { listTrades, getRiskSettings, getChecklist } from "@/lib/data";
+import { calculateStats, buildEquityCurve, formatCurrency, todayId } from "@/lib/utils";
+import type { Trade, RiskSettings } from "@/lib/types";
+import Link from "next/link";
 
 function getSessionInfo() {
   const utcHour = new Date().getUTCHours();
-  // Approximate XAUUSD session windows (UTC)
   if (utcHour >= 0 && utcHour < 7) return { name: "Asian", note: "Typically lower volatility. Range formation common." };
   if (utcHour >= 7 && utcHour < 12) return { name: "London", note: "Volatility expansion. Watch the London open sweep." };
   if (utcHour >= 12 && utcHour < 16) return { name: "London/NY Overlap", note: "Highest liquidity window of the day." };
@@ -22,28 +22,69 @@ function getSessionInfo() {
 export default function DashboardPage() {
   const { user } = useAuth();
   const [trades, setTrades] = useState<Trade[]>([]);
-  const [startingBalance, setStartingBalance] = useState(10000);
+  const [risk, setRisk] = useState<RiskSettings | null>(null);
+  const [checklistComplete, setChecklistComplete] = useState(false);
   const [loading, setLoading] = useState(true);
   const session = getSessionInfo();
 
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const [t, risk] = await Promise.all([listTrades(user.uid), getRiskSettings(user.uid)]);
+      const today = todayId();
+      const [t, r, c] = await Promise.all([
+        listTrades(user.uid),
+        getRiskSettings(user.uid),
+        getChecklist(user.uid, today)
+      ]);
       setTrades(t);
-      if (risk) setStartingBalance(risk.accountBalance);
+      setRisk(r);
+      setChecklistComplete(!!c?.completedAt);
       setLoading(false);
     })();
   }, [user]);
 
+  const startingBalance = risk?.accountBalance ?? 10000;
   const stats = useMemo(() => calculateStats(trades), [trades]);
   const equityCurve = useMemo(() => buildEquityCurve(trades, startingBalance), [trades, startingBalance]);
-  const today = new Date().toISOString().slice(0, 10);
+
+  const today = todayId();
   const todaysTrades = trades.filter((t) => t.date === today);
   const todaysPnl = todaysTrades.reduce((s, t) => s + t.pnl, 0);
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const weekPnl = trades.filter((t) => t.createdAt >= weekAgo).reduce((s, t) => s + t.pnl, 0);
+
+  const maxDailyLoss = risk ? risk.accountBalance * (risk.maxDailyLossPct / 100) : 0;
+  const maxWeeklyLoss = risk ? risk.accountBalance * (risk.maxWeeklyLossPct / 100) : 0;
+  const dailyLocked = risk && todaysPnl <= -maxDailyLoss;
+  const weeklyLocked = risk && weekPnl <= -maxWeeklyLoss;
 
   return (
     <AppShell eyebrow="Overview" title="Dashboard">
+      {(dailyLocked || weeklyLocked) && (
+        <Card className="mb-5 border-loss/40 bg-loss/5 px-5 py-4">
+          <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-loss">
+            {weeklyLocked ? "Weekly loss limit reached" : "Daily loss limit reached"}
+          </div>
+          <p className="mt-1 text-sm text-ink">
+            You have hit your {weeklyLocked ? "weekly" : "daily"} max loss threshold. Step away from the charts — this is the discipline framework working as intended.
+          </p>
+        </Card>
+      )}
+
+      {!checklistComplete && !loading && (
+        <Card className="mb-5 border-gold-dim/40 bg-gold/5 px-5 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-gold-bright">Pre-market checklist incomplete</div>
+              <p className="mt-1 text-sm text-muted">Complete today's checklist before trading.</p>
+            </div>
+            <Link href="/checklist">
+              <Button variant="ghost" className="text-xs">Open checklist</Button>
+            </Link>
+          </div>
+        </Card>
+      )}
+
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Total P&L" value={formatCurrency(stats.totalPnl)} tone={stats.totalPnl >= 0 ? "profit" : "loss"} sub={`${stats.totalTrades} trades logged`} />
         <StatCard label="Win Rate" value={`${stats.winRate.toFixed(1)}%`} />
@@ -98,6 +139,11 @@ export default function DashboardPage() {
                 {formatCurrency(todaysPnl)}
               </div>
               <div className="mt-0.5 text-xs text-muted">{todaysTrades.length} trade{todaysTrades.length === 1 ? "" : "s"} today</div>
+              {risk && (
+                <div className="mt-2 text-xs text-faint">
+                  Daily limit: {formatCurrency(-maxDailyLoss)} · Weekly: {formatCurrency(-maxWeeklyLoss)}
+                </div>
+              )}
             </div>
           </div>
         </Card>
