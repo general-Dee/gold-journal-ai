@@ -7,7 +7,7 @@ import { Badge, Button, Card, Select } from "@/components/ui/primitives";
 import { TradeFormModal } from "@/components/TradeFormModal";
 import { useAuth } from "@/lib/auth-context";
 import { listTrades, saveTrade, deleteTrade } from "@/lib/data";
-import { formatCurrency, formatR, todayId, tradesToCsv } from "@/lib/utils";
+import { formatCurrency, formatR, todayId, tradesToCsv, cx } from "@/lib/utils";
 import type { Trade } from "@/lib/types";
 
 export default function JournalPage() {
@@ -110,13 +110,13 @@ export default function JournalPage() {
     <AppShell eyebrow="Records" title="Trade Journal">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-3">
-          <Select value={setupFilter} onChange={(e) => setSetupFilter(e.target.value)} className="w-48">
+          <Select value={setupFilter} onChange={(e) => setSetupFilter(e.target.value)} className="w-full sm:w-48">
             <option>All</option>
             {["Trend Continuation", "Reversal", "Range Breakout", "Liquidity Sweep", "News Fade", "Support/Resistance", "Other"].map((s) => (
               <option key={s}>{s}</option>
             ))}
           </Select>
-          <Select value={sessionFilter} onChange={(e) => setSessionFilter(e.target.value)} className="w-40">
+          <Select value={sessionFilter} onChange={(e) => setSessionFilter(e.target.value)} className="w-full sm:w-40">
             <option>All</option>
             {["Asian", "London", "New York", "Overlap"].map((s) => (
               <option key={s}>{s}</option>
@@ -141,7 +141,8 @@ export default function JournalPage() {
         </Card>
       )}
 
-      <Card className="overflow-hidden">
+      {/* Desktop table */}
+      <Card className="hidden overflow-hidden md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -198,6 +199,45 @@ export default function JournalPage() {
           </table>
         </div>
       </Card>
+
+      {/* Mobile cards */}
+      <div className="space-y-3 md:hidden">
+        {filtered.map((t) => (
+          <Card key={t.id} className="p-4">
+            <div className="mb-3 flex items-start justify-between">
+              <div>
+                <Link href={`/journal/${t.id}`} className="font-medium text-ink hover:text-gold-bright">{t.date}</Link>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  <Badge tone={t.direction === "Long" ? "profit" : "loss"}>{t.direction}</Badge>
+                  <Badge>{t.session}</Badge>
+                  {t.mistakeTag !== "None" && <Badge tone="loss">{t.mistakeTag}</Badge>}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className={cx("font-mono text-lg tabular-nums", t.pnl >= 0 ? "text-profit" : "text-loss")}>{formatCurrency(t.pnl)}</div>
+                <div className={cx("font-mono text-sm tabular-nums", t.rMultiple >= 0 ? "text-profit" : "text-loss")}>{formatR(t.rMultiple)}</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs text-muted">
+              <div>Entry: <span className="font-mono text-ink">{t.entryPrice.toFixed(2)}</span></div>
+              <div>Exit: <span className="font-mono text-ink">{t.exitPrice.toFixed(2)}</span></div>
+              <div className="col-span-2">Setup: <span className="text-ink">{t.setupType}</span></div>
+            </div>
+            <div className="mt-3 flex justify-end gap-3 border-t border-line pt-3">
+              <button className="text-xs text-muted hover:text-gold-bright" onClick={() => { setEditing(t); setShowForm(true); }}>Edit</button>
+              <button className="text-xs text-muted hover:text-loss" onClick={() => handleDelete(t.id)}>Delete</button>
+            </div>
+          </Card>
+        ))}
+        {filtered.length === 0 && !loading && (
+          <Card className="p-8 text-center">
+            <p className="text-sm text-faint">No trades yet. Log your first XAUUSD trade to start building your track record.</p>
+            <div className="mt-4">
+              <Button onClick={() => { setEditing(undefined); setShowForm(true); }}>+ Log your first trade</Button>
+            </div>
+          </Card>
+        )}
+      </div>
 
       {showForm && (
         <TradeFormModal
