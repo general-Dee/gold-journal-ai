@@ -23,6 +23,8 @@ export default function JournalPage() {
   const [sortKey, setSortKey] = useState<"date" | "rMultiple" | "pnl" | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
+  const lastTrade = trades[0];
+
   function toggleSort(key: "date" | "rMultiple" | "pnl") {
     if (sortKey === key) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -121,7 +123,7 @@ export default function JournalPage() {
             ))}
           </Select>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <Button variant="ghost" onClick={exportCsv} disabled={filtered.length === 0}>
             Export CSV
           </Button>
@@ -186,6 +188,9 @@ export default function JournalPage() {
                 <tr>
                   <td colSpan={10} className="px-4 py-10 text-center text-sm text-faint">
                     No trades yet. Log your first XAUUSD trade to start building your track record.
+                    <div className="mt-3">
+                      <Button onClick={() => { setEditing(undefined); setShowForm(true); }}>+ Log your first trade</Button>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -197,6 +202,7 @@ export default function JournalPage() {
       {showForm && (
         <TradeFormModal
           initial={editing}
+          lastTrade={lastTrade}
           onClose={() => { setShowForm(false); setEditing(undefined); }}
           onSave={handleSave}
         />
