@@ -73,6 +73,14 @@ service cloud.firestore {
         && data.impact in ['Low', 'Medium', 'High'];
     }
 
+    function isAiReview(data) {
+      return data.keys().hasAll(['id', 'summary', 'tradeCount', 'createdAt'])
+        && data.id is string
+        && data.summary is string
+        && data.tradeCount is number
+        && data.createdAt is number;
+    }
+
     // /users/{uid}/trades/{tradeId}
     match /users/{uid}/trades/{tradeId} {
       allow read, delete: if isOwner(uid);
@@ -107,6 +115,12 @@ service cloud.firestore {
     match /users/{uid}/economicEvents/{eventId} {
       allow read, delete: if isOwner(uid);
       allow create, update: if isOwner(uid) && isEconomicEvent(request.resource.data);
+    }
+
+    // /users/{uid}/aiReviews/{reviewId}
+    match /users/{uid}/aiReviews/{reviewId} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid) && isAiReview(request.resource.data);
     }
 
     // Deny everything else by default
