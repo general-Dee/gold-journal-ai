@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button, Input, Label, Select, Textarea } from "@/components/ui/primitives";
-import { calculateTradePnl } from "@/lib/utils";
+import { calculateTradePnl, formatCurrency, formatR } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { uploadTradeScreenshot } from "@/lib/data";
 import { TradeSchema } from "@/lib/schemas";
@@ -14,10 +14,12 @@ const MISTAKES: MistakeTag[] = ["None", "Revenge Trade", "Early Entry", "Late En
 
 export function TradeFormModal({
   initial,
+  lastTrade,
   onClose,
   onSave
 }: {
   initial?: Trade;
+  lastTrade?: Trade;
   onClose: () => void;
   onSave: (trade: Trade) => Promise<void>;
 }) {
@@ -44,12 +46,41 @@ export function TradeFormModal({
     setForm((f) => ({ ...f, [key]: value }));
   }
 
+  function duplicateLast() {
+    if (!lastTrade) return;
+    setForm({
+      date: new Date().toISOString().slice(0, 10),
+      direction: lastTrade.direction,
+      lotSize: lastTrade.lotSize,
+      session: lastTrade.session,
+      setupType: lastTrade.setupType,
+      mistakeTag: "None",
+      emotionBefore: 3,
+      emotionDuring: 3,
+      emotionAfter: 3,
+      notes: "",
+      entryPrice: lastTrade.entryPrice,
+      stopLoss: lastTrade.stopLoss
+    });
+    setPendingDataUrl(null);
+  }
+
   function handleScreenshotChange(file: File | undefined) {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => setPendingDataUrl(reader.result as string);
     reader.readAsDataURL(file);
   }
+
+  const preview = useMemo(() => {
+    const entry = form.entryPrice ?? 0;
+    const exit = form.exitPrice ?? 0;
+    const stop = form.stopLoss ?? 0;
+    const lot = form.lotSize ?? 0;
+    if (!entry || !exit || !stop || !lot) return null;
+    const direction: Direction = (form.direction as Direction) ?? "Long";
+    return calculateTradePnl({ direction, entryPrice: entry, exitPrice: exit, stopLoss: stop, lotSize: lot });
+  }, [form.entryPrice, form.exitPrice, form.stopLoss, form.lotSize, form.direction]);
 
   async function handleSubmit() {
     const entry = form.entryPrice ?? 0;
@@ -116,7 +147,37 @@ export function TradeFormModal({
         className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-line bg-surface p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-5 font-display text-lg font-medium text-ink">{initial ? "Edit Trade" : "Log New Trade"}</h2>
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="font-display text-lg font-medium text-ink">{initial ? "Edit Trade" : "Log New Trade"}</h2>
+          {!initial && lastTrade && (
+            <Button variant="ghost" onClick={duplicateLast} className="text-xs">
+              Duplicate last
+            </Button>
+          )}
+        </div>
+
+        {preview && (
+          <div className="mb-4 rounded-md border border-gold-dim/40 bg-gold/5 p-3">
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-wide text-faint">P&L</div>
+                <div className={`font-display text-lg tabular-nums ${preview.pnl >= 0 ? "text-profit" : "text-loss"}`}>
+                  {formatCurrency(preview.pnl)}
+                </div>
+              </div>
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-wide text-faint">R</div>
+                <div className={`font-display text-lg tabular-nums ${preview.rMultiple >= 0 ? "text-profit" : "text-loss"}`}>
+                  {formatR(preview.rMultiple)}
+                </div>
+              </div>
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-wide text-faint">Risk</div>
+                <div className="font-display text-lg tabular-nums text-ink">{formatCurrency(preview.riskAmount)}</div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -203,7 +264,6 @@ export function TradeFormModal({
         <div className="mt-4">
           <Label>Screenshot (optional)</Label>
           {(pendingDataUrl ?? form.screenshotUrl) && (
-            // eslint-disable-next-line @next/next/no-img-element -- previews an unsaved local file via a data: URL, which next/image can't render
             <img
               src={pendingDataUrl ?? form.screenshotUrl}
               alt="Trade screenshot preview"
